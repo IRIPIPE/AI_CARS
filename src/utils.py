@@ -24,6 +24,12 @@ from config import (
 
 PathLike = str | Path
 
+SPLIT_ALIASES = {
+    "train": {"train", "training"},
+    "validation": {"val", "valid", "validation"},
+    "test": {"test", "testing"},
+}
+
 
 def ensure_parent_dir(path: PathLike) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -55,12 +61,41 @@ def has_class_subdirectories(directory: Path) -> bool:
     return len(dirs_with_images) >= 2
 
 
+def find_split_dirs(directory: PathLike) -> Dict[str, Path]:
+    directory = Path(directory)
+    if not directory.exists():
+        return {}
+
+    children_by_name = {
+        child.name.lower().replace(" ", "").replace("_", "").replace("-", ""): child
+        for child in directory.iterdir()
+        if child.is_dir()
+    }
+
+    split_dirs: Dict[str, Path] = {}
+    for split_name, aliases in SPLIT_ALIASES.items():
+        for alias in aliases:
+            normalized_alias = alias.lower().replace(" ", "").replace("_", "").replace("-", "")
+            candidate = children_by_name.get(normalized_alias)
+            if candidate is not None and has_class_subdirectories(candidate):
+                split_dirs[split_name] = candidate
+                break
+
+    return split_dirs
+
+
+def is_split_dataset_root(directory: PathLike) -> bool:
+    split_dirs = find_split_dirs(directory)
+    return "train" in split_dirs and "validation" in split_dirs and "test" in split_dirs
+
+
 def find_dataset_root(raw_data_dir: PathLike) -> Path:
     """Find the directory that directly contains class subdirectories.
 
     Kaggle archives are not always unpacked in the same shape. This function
-    supports both `data/raw/ClassName/*.jpg` and nested layouts such as
-    `data/raw/vehicle_images/ClassName/*.jpg`.
+    supports `data/raw/ClassName/*.jpg`, nested layouts such as
+    `data/raw/vehicle_images/ClassName/*.jpg`, and predefined layouts such as
+    `data/raw/train/ClassName/*.jpg`.
     """
 
     raw_data_dir = Path(raw_data_dir)
@@ -70,8 +105,20 @@ def find_dataset_root(raw_data_dir: PathLike) -> Path:
             "Скачайте и распакуйте датасет в data/raw/."
         )
 
+    if is_split_dataset_root(raw_data_dir):
+        return raw_data_dir
+
     if has_class_subdirectories(raw_data_dir):
         return raw_data_dir
+
+    split_candidates = [
+        item
+        for item in raw_data_dir.rglob("*")
+        if item.is_dir() and is_split_dataset_root(item)
+    ]
+    if split_candidates:
+        split_candidates.sort(key=lambda path: len(path.parts))
+        return split_candidates[0]
 
     candidates = [
         item
@@ -90,6 +137,17 @@ def find_dataset_root(raw_data_dir: PathLike) -> Path:
 
 def get_class_names(dataset_root: PathLike) -> List[str]:
     dataset_root = Path(dataset_root)
+    split_dirs = find_split_dirs(dataset_root)
+    if is_split_dataset_root(dataset_root):
+        class_names = set()
+        for split_dir in split_dirs.values():
+            class_names.update(
+                item.name
+                for item in split_dir.iterdir()
+                if item.is_dir() and count_images_in_dir(item) > 0
+            )
+        return sorted(class_names)
+
     class_names = [
         item.name
         for item in dataset_root.iterdir()
@@ -100,7 +158,31 @@ def get_class_names(dataset_root: PathLike) -> List[str]:
 
 def get_image_counts(dataset_root: PathLike) -> Dict[str, int]:
     dataset_root = Path(dataset_root)
-    return {class_name: count_images_in_dir(dataset_root / class_name) for class_name in get_class_names(dataset_root)}
+    class_names = get_class_names(dataset_root)
+    if is_split_dataset_root(dataset_root):
+        split_dirs = find_split_dirs(dataset_root)
+        return {
+            class_name: sum(count_images_in_dir(split_dir / class_name) for split_dir in split_dirs.values())
+            for class_name in class_names
+        }
+
+    return {class_name: count_images_in_dir(dataset_root / class_name) for class_name in class_names}
+
+
+def collect_from_class_root(class_root: PathLike, class_names: Sequence[str]) -> Tuple[List[str], List[int]]:
+    class_root = Path(class_root)
+    image_paths: List[str] = []
+    labels: List[int] = []
+
+    for label, class_name in enumerate(class_names):
+        class_dir = class_root / class_name
+        if not class_dir.exists():
+            continue
+        paths = sorted(str(path) for path in class_dir.rglob("*") if is_image_file(path))
+        image_paths.extend(paths)
+        labels.extend([label] * len(paths))
+
+    return image_paths, labels
 
 
 def collect_image_paths_and_labels(dataset_root: PathLike) -> Tuple[List[str], List[int], List[str]]:
@@ -109,19 +191,58 @@ def collect_image_paths_and_labels(dataset_root: PathLike) -> Tuple[List[str], L
     if len(class_names) < 2:
         raise ValueError("Для обучения требуется минимум два класса изображений.")
 
-    image_paths: List[str] = []
-    labels: List[int] = []
-
-    for label, class_name in enumerate(class_names):
-        class_dir = dataset_root / class_name
-        paths = sorted(str(path) for path in class_dir.rglob("*") if is_image_file(path))
-        image_paths.extend(paths)
-        labels.extend([label] * len(paths))
+    if is_split_dataset_root(dataset_root):
+        split_dirs = find_split_dirs(dataset_root)
+        image_paths: List[str] = []
+        labels: List[int] = []
+        for split_dir in split_dirs.values():
+            split_paths, split_labels = collect_from_class_root(split_dir, class_names)
+            image_paths.extend(split_paths)
+            labels.extend(split_labels)
+    else:
+        image_paths, labels = collect_from_class_root(dataset_root, class_names)
 
     if not image_paths:
         raise ValueError("Изображения не найдены.")
 
     return image_paths, labels, class_names
+
+
+def load_dataset_splits(
+    data_dir: PathLike,
+) -> Tuple[Path, List[str], List[str], List[str], List[int], List[int], List[int], List[str], str]:
+    """Load train/validation/test splits from disk or create them deterministically."""
+
+    dataset_root = find_dataset_root(data_dir)
+    class_names = get_class_names(dataset_root)
+    if len(class_names) < 2:
+        raise ValueError("Для обучения требуется минимум два класса изображений.")
+
+    if is_split_dataset_root(dataset_root):
+        split_dirs = find_split_dirs(dataset_root)
+        train_paths, train_labels = collect_from_class_root(split_dirs["train"], class_names)
+        val_paths, val_labels = collect_from_class_root(split_dirs["validation"], class_names)
+        test_paths, test_labels = collect_from_class_root(split_dirs["test"], class_names)
+        split_mode = "predefined"
+    else:
+        image_paths, labels, class_names = collect_image_paths_and_labels(dataset_root)
+        train_paths, val_paths, test_paths, train_labels, val_labels, test_labels = split_dataset(image_paths, labels)
+        split_mode = "generated"
+
+    if not train_paths or not val_paths or not test_paths:
+        raise ValueError("Одна из выборок train/validation/test пуста. Проверьте структуру датасета.")
+
+    return (
+        dataset_root,
+        train_paths,
+        val_paths,
+        test_paths,
+        train_labels,
+        val_labels,
+        test_labels,
+        class_names,
+        split_mode,
+    )
 
 
 def _can_stratify(labels: Sequence[int]) -> bool:

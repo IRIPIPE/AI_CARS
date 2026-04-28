@@ -22,11 +22,20 @@
 
 ## Источник датасета
 
-Используется открытый датасет Kaggle:
+Проект изначально подготовлен для открытого датасета Kaggle:
 
 - Название: Vehicle Images Dataset
 - Ссылка: https://www.kaggle.com/datasets/lyensoetanto/vehicle-images-dataset
 - Kaggle slug: `lyensoetanto/vehicle-images-dataset`
+
+Также проект поддерживает более сфокусированный датасет для классификации типа кузова:
+
+- Название: Car Body Types Images Dataset
+- Ссылка: https://www.kaggle.com/datasets/ademboukhris/cars-body-type-cropped
+- Kaggle slug: `ademboukhris/cars-body-type-cropped`
+- Классы: Convertible, Coupe, Hatchback, Pick-Up, SUV, Sedan, VAN
+
+Для итогового эксперимента по типам кузова второй датасет часто объективнее, потому что классы ближе к реальной задаче body type classification и сбалансированы примерно по 1000 изображений на класс.
 
 ## Структура проекта
 
@@ -121,7 +130,20 @@ kaggle datasets download -d lyensoetanto/vehicle-images-dataset
 unzip vehicle-images-dataset.zip -d data/raw/
 ```
 
-Скрипты проекта ожидают, что внутри `data/raw/` или во вложенной папке будут директории классов, например:
+Для датасета типов кузова:
+
+```bash
+kaggle datasets download -d ademboukhris/cars-body-type-cropped
+unzip cars-body-type-cropped.zip -d data/raw/
+```
+
+Не смешивайте два датасета внутри одной папки `data/raw/`. Если хотите сохранить оба, распакуйте их в разные папки и передайте нужную через `--data-dir`:
+
+```bash
+python src/train_model.py --data-dir data/car_body_types
+```
+
+Скрипты проекта поддерживают два варианта структуры. Первый вариант: внутри `data/raw/` или во вложенной папке находятся директории классов, например:
 
 ```text
 data/raw/
@@ -133,6 +155,26 @@ data/raw/
 ├── Truck/
 └── Van/
 ```
+
+Второй вариант: датасет уже содержит готовое разделение:
+
+```text
+data/raw/
+├── Training/
+│   ├── Convertible/
+│   ├── Coupe/
+│   └── ...
+├── Validation/
+│   ├── Convertible/
+│   ├── Coupe/
+│   └── ...
+└── Testing/
+    ├── Convertible/
+    ├── Coupe/
+    └── ...
+```
+
+Если готовые split-папки найдены, проект использует их напрямую. Если их нет, проект сам создает train/validation/test split.
 
 ## Проверка и подготовка датасета
 

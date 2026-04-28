@@ -40,11 +40,17 @@
 
 ## 6. Источник исходных данных
 
-В проекте используется открытый датасет Kaggle `Vehicle Images Dataset`.
+В проекте может использоваться открытый датасет Kaggle `Vehicle Images Dataset` или более специализированный датасет `Car Body Types Images Dataset`.
 
-Источник: https://www.kaggle.com/datasets/lyensoetanto/vehicle-images-dataset
+Первоначальный источник: https://www.kaggle.com/datasets/lyensoetanto/vehicle-images-dataset
 
 Kaggle slug: `lyensoetanto/vehicle-images-dataset`.
+
+Альтернативный источник для классификации типа кузова: https://www.kaggle.com/datasets/ademboukhris/cars-body-type-cropped
+
+Kaggle slug: `ademboukhris/cars-body-type-cropped`.
+
+Данный набор содержит классы Convertible, Coupe, Hatchback, Pick-Up, SUV, Sedan и VAN. Он является более узко направленным на задачу классификации типа кузова автомобиля.
 
 Датасет может быть скачан вручную через веб-интерфейс Kaggle или с использованием Kaggle API командой:
 

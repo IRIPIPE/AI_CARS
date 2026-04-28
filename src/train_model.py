@@ -24,15 +24,13 @@ from config import (
 )
 from utils import (
     build_cnn_model,
-    collect_image_paths_and_labels,
     enable_fine_tuning,
-    find_dataset_root,
     get_image_counts,
+    load_dataset_splits,
     make_dataset,
     merge_histories,
     plot_training_history,
     save_json,
-    split_dataset,
 )
 
 
@@ -111,16 +109,25 @@ def main() -> None:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
-    dataset_root = find_dataset_root(args.data_dir)
-    image_paths, labels, class_names = collect_image_paths_and_labels(dataset_root)
+    (
+        dataset_root,
+        train_paths,
+        val_paths,
+        test_paths,
+        train_labels,
+        val_labels,
+        test_labels,
+        class_names,
+        split_mode,
+    ) = load_dataset_splits(args.data_dir)
     class_indices = {class_name: index for index, class_name in enumerate(class_names)}
 
     print(f"Найдена папка датасета: {dataset_root}")
+    print(f"Режим разделения данных: {split_mode}")
     print("Количество изображений по классам:")
     for class_name, count in get_image_counts(dataset_root).items():
         print(f"  {class_name}: {count}")
 
-    train_paths, val_paths, test_paths, train_labels, val_labels, test_labels = split_dataset(image_paths, labels)
     print(
         f"Размеры выборок: train={len(train_paths)}, "
         f"validation={len(val_paths)}, test={len(test_paths)}"
@@ -187,6 +194,7 @@ def main() -> None:
         {
             "dataset_root": str(dataset_root),
             "architecture": "EfficientNetB0 transfer learning",
+            "split_mode": split_mode,
             "image_size": list(image_size),
             "batch_size": args.batch_size,
             "head_epochs": args.head_epochs,

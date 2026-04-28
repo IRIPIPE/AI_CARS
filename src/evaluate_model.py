@@ -21,11 +21,9 @@ from config import (
     TRAINING_CONFIG_PATH,
 )
 from utils import (
-    collect_image_paths_and_labels,
-    find_dataset_root,
     load_json,
+    load_dataset_splits,
     make_dataset,
-    split_dataset,
 )
 
 
@@ -62,9 +60,19 @@ def main() -> None:
     if not CLASS_INDICES_PATH.exists():
         raise FileNotFoundError(f"Словарь классов не найден: {CLASS_INDICES_PATH}. Сначала запустите обучение.")
 
-    dataset_root = find_dataset_root(args.data_dir)
-    image_paths, labels, class_names = collect_image_paths_and_labels(dataset_root)
-    _, _, test_paths, _, _, test_labels = split_dataset(image_paths, labels)
+    (
+        dataset_root,
+        _train_paths,
+        _val_paths,
+        test_paths,
+        _train_labels,
+        _val_labels,
+        test_labels,
+        class_names,
+        split_mode,
+    ) = load_dataset_splits(args.data_dir)
+    print(f"Найдена папка датасета: {dataset_root}")
+    print(f"Режим разделения данных: {split_mode}")
 
     class_indices = load_json(CLASS_INDICES_PATH)
     class_names_by_index = [class_name for class_name, _ in sorted(class_indices.items(), key=lambda item: item[1])]

@@ -21,7 +21,11 @@ from utils import load_json, predict_image
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "bmp", "webp"}
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=str(PROJECT_ROOT / "app" / "templates"),
+    static_folder=str(PROJECT_ROOT / "app" / "static"),
+)
 app.config["UPLOAD_FOLDER"] = UPLOAD_DIR
 
 model = None
