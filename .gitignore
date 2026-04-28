@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+
+data/raw/*
+!data/raw/README.md
+models/*.keras
+models/*.h5
+
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+
+reports/figures/*.png
+.ipynb_checkpoints/
+.DS_Store

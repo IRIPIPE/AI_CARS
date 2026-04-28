@@ -1,0 +1,9 @@
+{
+  "Big Truck": 0,
+  "City Car": 1,
+  "Multi Purpose Vehicle": 2,
+  "Sedan": 3,
+  "Sport Utility Vehicle": 4,
+  "Truck": 5,
+  "Van": 6
+}

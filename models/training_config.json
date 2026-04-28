@@ -1,0 +1,24 @@
+{
+  "dataset_root": "/home/ivan/Documents/AI/vehicle_type_cnn_project/data/raw",
+  "architecture": "EfficientNetB0 transfer learning",
+  "image_size": [
+    224,
+    224
+  ],
+  "batch_size": 32,
+  "head_epochs": 8,
+  "fine_tune_epochs": 20,
+  "fine_tune_layers": 40,
+  "classes": [
+    "Big Truck",
+    "City Car",
+    "Multi Purpose Vehicle",
+    "Sedan",
+    "Sport Utility Vehicle",
+    "Truck",
+    "Van"
+  ],
+  "train_size": 10951,
+  "validation_size": 2347,
+  "test_size": 2347
+}
